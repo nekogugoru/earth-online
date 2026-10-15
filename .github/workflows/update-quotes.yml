@@ -1,0 +1,35 @@
+name: 更新收盤價
+
+on:
+  schedule:
+    # 台股收盤後：台北 14:20 與 16:20（UTC 06:20、08:20），週一到週五
+    - cron: "20 6 * * 1-5"
+    - cron: "20 8 * * 1-5"
+    # 美股收盤後：台北 06:20（UTC 22:20），週一到週五（對應美國週一到週五）
+    - cron: "20 22 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-quotes
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 抓報價
+        run: python scripts/fetch_quotes.py
+      - name: 有變動才 commit
+        run: |
+          git config user.name "quote-bot"
+          git config user.email "quote-bot@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "報價更新 $(TZ=Asia/Taipei date +'%Y-%m-%d %H:%M')"
+          git push
